@@ -54,7 +54,9 @@ export function roleGuardMiddleware(...roles: Role[]) {
       return next(new UnauthorizedError());
     }
 
-    const hasAccess = roles.some((role) => res.locals.user.roles.includes(role));
+    const hasAccess = roles.some((role) =>
+      res.locals.user.roles.includes(role),
+    );
 
     if (!hasAccess) {
       return next(new ForbiddenError());
@@ -87,7 +89,9 @@ export function currentUserAccessMiddleware<T>(
     }
 
     const userEntityId = entity[userProperty] as Types.ObjectId;
-    const hasAccess = new Types.ObjectId(res.locals.user.id).equals(userEntityId);
+    const hasAccess = new Types.ObjectId(res.locals.user.id).equals(
+      userEntityId,
+    );
 
     if (!hasAccess) {
       return next(new ForbiddenError());
