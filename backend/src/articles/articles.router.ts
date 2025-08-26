@@ -66,10 +66,4 @@ articlesRouter.delete(
   controller.removeLike,
 );
 
-/**
- * Удаление лайка
- * TODO: DELETE ARTICLES_PATH/:id/favourites
- * Защищенный маршрут
- */
-
 export default articlesRouter;

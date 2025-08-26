@@ -49,21 +49,29 @@ export class ArticlesController {
   ) => {
     try {
       const { title, slug, description, body, tags = [], image } = req.body;
+
+      const user = res.locals.user; // здесь лежит пользователь
+      if (!user) return res.status(401).send({ message: 'Unauthorized' });
+
       const tagIds = tags.length ? await this.updateAndCreateTags(tags) : [];
 
-      const article = await this.articleModel.create({
+      const article = new this.articleModel({
         title,
         slug,
         description,
         body,
         tags: tagIds,
         image,
-        author: req.user.id, // допустим, req.user есть
+        author: user._id,
       });
 
-      await (article as any).populate('tags').populate('author');
+      await article.save();
+      const populatedArticle = await this.articleModel
+        .findById(article._id)
+        .populate('tags')
+        .populate('author');
 
-      res.status(201).send(article);
+      res.status(201).send(populatedArticle);
     } catch (err) {
       next(err);
     }
@@ -190,7 +198,10 @@ export class ArticlesController {
       const article = await this.articleModel
         .findByIdAndUpdate(
           req.params.id,
-          { $addToSet: { favoredBy: req.user.id }, $inc: { favoredCount: 1 } },
+          {
+            $addToSet: { favoredBy: res.locals.user._id },
+            $inc: { favoredCount: 1 },
+          },
           { new: true },
         )
         .populate('tags')
@@ -213,7 +224,10 @@ export class ArticlesController {
       const article = await this.articleModel
         .findByIdAndUpdate(
           req.params.id,
-          { $pull: { favoredBy: req.user.id }, $inc: { favoredCount: -1 } },
+          {
+            $pull: { favoredBy: res.locals.user._id },
+            $inc: { favoredCount: -1 },
+          },
           { new: true },
         )
         .populate('tags')
