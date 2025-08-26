@@ -151,12 +151,16 @@ export class ArticlesController {
       if (body.tags.length) {
         body.tags = await this.updateAndCreateTags(body.tags);
       }
-      /**
-       * TODO: Добавить функционал обновления статьи
-       * Возвращает обновленную статью типа IArticle
-       */
-      res.send(null);
-    } catch (error) {}
+      const article = await this.articleModel
+        .findByIdAndUpdate(req.params.id, body, { new: true })
+        .populate('tags')
+        .populate('author');
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.send(article);
+    } catch (err) {
+      next(err);
+    }
   };
 
   delete = async (
@@ -165,12 +169,16 @@ export class ArticlesController {
     next: NextFunction,
   ) => {
     try {
-      /**
-       * TODO: Добавить функционал удаления статьи
-       * Возвращает удаленную статью типа IArticle
-       */
-      res.status(200).send(null);
-    } catch (error) {}
+      const article = await this.articleModel
+        .findByIdAndDelete(req.params.id)
+        .populate('tags')
+        .populate('author');
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.send(article);
+    } catch (err) {
+      next(err);
+    }
   };
 
   likeArticle = async (
@@ -179,14 +187,21 @@ export class ArticlesController {
     next: NextFunction,
   ) => {
     try {
-      /**
-       * TODO: Добавление лайка к статье, добавляется id пользователя поставившего лайк в массив favoredBy, увеличивает поле favoredCount на 1
-       * Использовать $addToSet и $inc
-       * Необходимо расширить поля tags и author перед возвратом данных на клиент
-       * Возвращает IArticle
-       */
-      return res.status(201).send(null);
-    } catch (error) {}
+      const article = await this.articleModel
+        .findByIdAndUpdate(
+          req.params.id,
+          { $addToSet: { favoredBy: req.user.id }, $inc: { favoredCount: 1 } },
+          { new: true },
+        )
+        .populate('tags')
+        .populate('author');
+
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.status(201).send(article);
+    } catch (err) {
+      next(err);
+    }
   };
 
   removeLike = async (
@@ -195,13 +210,20 @@ export class ArticlesController {
     next: NextFunction,
   ) => {
     try {
-      /**
-       * TODO: Удаление лайка у статьи, удаляет id пользователя поставившего лайк из массива favoredBy, уменьшает поле favoredCount на 1
-       * Использовать $pull и $inc
-       * Необходимо расширить поля tags и author перед возвратом данных на клиент
-       * Возвращает IArticle
-       */
-      return res.status(200).send(null);
-    } catch (error) {}
+      const article = await this.articleModel
+        .findByIdAndUpdate(
+          req.params.id,
+          { $pull: { favoredBy: req.user.id }, $inc: { favoredCount: -1 } },
+          { new: true },
+        )
+        .populate('tags')
+        .populate('author');
+
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.send(article);
+    } catch (err) {
+      next(err);
+    }
   };
 }
