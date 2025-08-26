@@ -54,7 +54,7 @@ export const validateGetArticlesQuery = celebrate({
     isFavourite: Joi.boolean().optional(),
     limit: Joi.number().integer().min(1).optional(),
     offset: Joi.number().integer().min(0).optional(),
-    sort: Joi.string().valid('popular', 'date').optional(),
+    sort: Joi.string().valid('recent', 'popular').optional(),
   }),
 });
 
