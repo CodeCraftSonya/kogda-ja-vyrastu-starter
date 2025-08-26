@@ -1,7 +1,7 @@
 import { model, Schema, Types } from 'mongoose';
 import { PublishState } from '../../src/types/publish-state';
-import type { ITag } from '../tags/tags.model';
 import { IUser } from '../users/users.model';
+import slugify from 'slugify';
 
 export interface IArticle {
   id: string;
@@ -15,29 +15,87 @@ export interface IArticle {
   updatedAt: Date;
   author: IUser;
   state: PublishState;
-  tags: ITag;
+  tags: Types.ObjectId[];
   favoredBy: Types.ObjectId[];
   favoredCount: number;
 }
 
 const articleSchema = new Schema<IArticle>(
   {
-    /**
-    * TODO: Описать схему в соответствии с типом IArticle и описанием схемы в swagger
-    */
+    title: {
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 30,
+    },
+    image: {
+      type: String,
+      validate: {
+        validator: (v: string) =>
+          !v || /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|svg)$/.test(v),
+        message: 'Поле image должно быть валидным URL до изображения',
+      },
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    link: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    body: {
+      type: String,
+      required: true,
+    },
+    author: {
+      type: Schema.Types.ObjectId,
+      ref: 'users',
+      required: true,
+    },
+    tags: {
+      type: [Schema.Types.ObjectId],
+      ref: 'tags',
+      default: [],
+    },
+    favoredBy: {
+      type: [Schema.Types.ObjectId],
+      ref: 'users',
+      default: [],
+    },
+    favoredCount: {
+      type: Number,
+      default: 0,
+    },
+    state: {
+      type: String,
+      enum: Object.values(PublishState),
+      required: true,
+      default: PublishState.Draft,
+    },
   },
-  { 
-     /**
-    * TODO: Добавить автоматическую генерации даты создания и обновления
-    */
-   },
+  {
+    timestamps: true,
+  },
 );
 
-articleSchema.pre('validate', function (next) {
+articleSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+articleSchema.pre('validate', function (this: IArticle, next) {
   if (!this.slug) {
-    /**
-    * TODO: Генерация уникального slug из title, используйте библиотеку slugify
-    */
+    this.slug = slugify(this.title, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
   }
   this.link = `/article/${this.slug}`;
   next();

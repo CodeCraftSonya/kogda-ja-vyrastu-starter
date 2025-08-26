@@ -14,17 +14,32 @@ export class ArticlesController {
     private articleModel: ArticleModel,
     private tagModel: TagModel,
     private userModel: UserModel,
-  ) { }
+  ) {}
 
   updateAndCreateTags = async (bodyTags: string[]) => {
-    /**
-     * TODO: Добавить логику проверки тегов в базе во избежания дублей
-     * bodyTags это массив тегов в формате ["tag1", "tag2"]
-     * Используйте метод this.tagModel.find с использованием "$in"
-     * Функция проверяет есть ли тег в списке переданных и если его нет в базе, то создает тег
-     * Возвращает массив id тегов в формате ["idTag1",  "idTag1"]
-     */
-    return [];
+    if (!bodyTags || bodyTags.length === 0) return [];
+
+    // 1️⃣ Находим все существующие теги из базы, которые совпадают с bodyTags
+    const existingTags = await this.tagModel.find({
+      label: { $in: bodyTags },
+    });
+
+    // 2️⃣ Сохраняем найденные ID
+    const existingTagIds = existingTags.map((tag) => tag._id.toString());
+
+    // 3️⃣ Определяем теги, которых нет в базе
+    const existingLabels = existingTags.map((tag) => tag.label);
+    const newLabels = bodyTags.filter((tag) => !existingLabels.includes(tag));
+
+    // 4️⃣ Создаём новые теги
+    const newTags = await this.tagModel.insertMany(
+      newLabels.map((label) => ({ label })),
+    );
+
+    const newTagIds = newTags.map((tag) => tag._id.toString());
+
+    // 5️⃣ Возвращаем объединённый массив ID (существующие + новые)
+    return [...existingTagIds, ...newTagIds];
   };
 
   create = async (
@@ -32,19 +47,25 @@ export class ArticlesController {
     res: Response,
     next: NextFunction,
   ) => {
-    const { title, slug, description, body, tags = [], image } = req.body;
     try {
-      let tagsEntity: string[] = [];
-      if (tags.length) {
-        tagsEntity = await this.updateAndCreateTags(tags);
-      }
-      /**
-      * TODO: Добавить функционал создания статьи
-      * Возвращает созданную статью типа IArticle
-      */
-      return null;
-    } catch (err) {
+      const { title, slug, description, body, tags = [], image } = req.body;
+      const tagIds = tags.length ? await this.updateAndCreateTags(tags) : [];
 
+      const article = await this.articleModel.create({
+        title,
+        slug,
+        description,
+        body,
+        tags: tagIds,
+        image,
+        author: req.user.id, // допустим, req.user есть
+      });
+
+      await (article as any).populate('tags').populate('author');
+
+      res.status(201).send(article);
+    } catch (err) {
+      next(err);
     }
   };
 
@@ -54,26 +75,14 @@ export class ArticlesController {
     next: NextFunction,
   ) => {
     try {
-      const {
-        limit = 20,
-        offset = 0,
-        sort,
-        author,
-        isFavourite,
-      } = req.query;
+      const { limit = 20, offset = 0, sort, author, isFavourite } = req.query;
 
       const filter: FilterQuery<IArticle> = {};
 
-      if (author) {
-        /**
-        * TODO: Добавить фильтрацию по автору
-        */
-      }
+      if (author) filter.author = author;
 
-      if (isFavourite) {
-        /**
-        * TODO: Добавить фильтрацию избранных статей текущего пользователя
-        */
+      if (isFavourite && req.user) {
+        filter.favoredBy = req.user.id;
       }
 
       const options: QueryOptions<IArticle> = {
@@ -81,59 +90,59 @@ export class ArticlesController {
         skip: offset,
       };
 
-      switch (sort) {
-        /**
-        * TODO: Описать логику сортировки популярных товаров и по дате
-        */
-      }
+      let query = this.articleModel
+        .find(filter, null, options)
+        .populate('tags')
+        .populate('author');
 
-       /**
-        * TODO: Поиск с фильтрами и сортировками.
-        * Необходимо расширить поля tags и author перед возвратом данных на клиент
-        * Возвращает IArticle[]
-        */
-      res.send([]);
-    } catch (error) {
+      if (sort === 'popular') query = query.sort({ favoredCount: -1 });
+      else query = query.sort({ createdAt: -1 });
+
+      const articles = await query.exec();
+      res.send(articles);
+    } catch (err) {
+      next(err);
     }
-
   };
 
   findOne = async (
-    req: Request<{ id: string; }, IArticle>,
+    req: Request<{ id: string }, IArticle>,
     res: Response,
     next: NextFunction,
   ) => {
     try {
-      /**
-        * TODO: Поиск детальной статьи по id.
-        * Необходимо расширить поля tags и author перед возвратом данных на клиент
-        * Возвращает IArticle
-        */
-      return res.send(null);
-    } catch (error) {
+      const article = await this.articleModel
+        .findById(req.params.id)
+        .populate('tags')
+        .populate('author');
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.send(article);
+    } catch (err) {
+      next(err);
     }
-
   };
 
   findOneBySlug = async (
-    req: Request<{ slug: string; }, IArticle>,
+    req: Request<{ slug: string }, IArticle>,
     res: Response,
     next: NextFunction,
   ) => {
     try {
-      /**
-        * TODO: Поиск детальной статьи по slug.
-        * Необходимо расширить поля tags и author перед возвратом данных на клиент
-        * Возвращает IArticle
-        */
-      return res.send(null);
-    } catch (error) {
+      const article = await this.articleModel
+        .findOne({ slug: req.params.slug })
+        .populate('tags')
+        .populate('author');
+      if (!article)
+        return res.status(404).send({ message: 'Article not found' });
+      res.send(article);
+    } catch (err) {
+      next(err);
     }
-
   };
 
   update = async (
-    req: Request<{ id: string; }, IArticle, UpdateArticleBody>,
+    req: Request<{ id: string }, IArticle, UpdateArticleBody>,
     res: Response,
     next: NextFunction,
   ) => {
@@ -143,63 +152,56 @@ export class ArticlesController {
         body.tags = await this.updateAndCreateTags(body.tags);
       }
       /**
-      * TODO: Добавить функционал обновления статьи
-      * Возвращает обновленную статью типа IArticle
-      */
+       * TODO: Добавить функционал обновления статьи
+       * Возвращает обновленную статью типа IArticle
+       */
       res.send(null);
-    } catch (error) {
-    }
-
+    } catch (error) {}
   };
 
   delete = async (
-    req: Request<{ id: string; }>,
+    req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
   ) => {
     try {
       /**
-      * TODO: Добавить функционал удаления статьи
-      * Возвращает удаленную статью типа IArticle
-      */
+       * TODO: Добавить функционал удаления статьи
+       * Возвращает удаленную статью типа IArticle
+       */
       res.status(200).send(null);
-    } catch (error) {
-    }
-
+    } catch (error) {}
   };
 
   likeArticle = async (
-    req: Request<{ id: string; }>,
+    req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
   ) => {
     try {
       /**
-        * TODO: Добавление лайка к статье, добавляется id пользователя поставившего лайк в массив favoredBy, увеличивает поле favoredCount на 1
-        * Использовать $addToSet и $inc
-        * Необходимо расширить поля tags и author перед возвратом данных на клиент
-        * Возвращает IArticle
-        */
+       * TODO: Добавление лайка к статье, добавляется id пользователя поставившего лайк в массив favoredBy, увеличивает поле favoredCount на 1
+       * Использовать $addToSet и $inc
+       * Необходимо расширить поля tags и author перед возвратом данных на клиент
+       * Возвращает IArticle
+       */
       return res.status(201).send(null);
-    } catch (error) {
-    }
-
+    } catch (error) {}
   };
 
   removeLike = async (
-    req: Request<{ id: string; }>,
+    req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
   ) => {
     try {
       /**
-        * TODO: Удаление лайка у статьи, удаляет id пользователя поставившего лайк из массива favoredBy, уменьшает поле favoredCount на 1
-        * Использовать $pull и $inc
-        * Необходимо расширить поля tags и author перед возвратом данных на клиент
-        * Возвращает IArticle
-        */
+       * TODO: Удаление лайка у статьи, удаляет id пользователя поставившего лайк из массива favoredBy, уменьшает поле favoredCount на 1
+       * Использовать $pull и $inc
+       * Необходимо расширить поля tags и author перед возвратом данных на клиент
+       * Возвращает IArticle
+       */
       return res.status(200).send(null);
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 }
