@@ -25,11 +25,8 @@ export const validateCreateArticle = celebrate({
     slug: Joi.string().optional(),
     description: Joi.string().required(),
     body: Joi.string().required(),
-    image: Joi.string()
-      .uri()
-      .regex(/\.(jpg|jpeg|png|webp|gif|svg)$/)
-      .optional(),
-    tags: Joi.array().items(Joi.string()).optional(),
+    image: Joi.string().uri().allow('', null).optional(),
+    tags: Joi.array().items(Joi.string().allow('')).optional(),
   }),
 });
 

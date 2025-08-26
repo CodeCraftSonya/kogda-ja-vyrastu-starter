@@ -30,11 +30,11 @@ const articleSchema = new Schema<IArticle>(
     },
     image: {
       type: String,
-      validate: {
-        validator: (v: string) =>
-          !v || /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|svg)$/.test(v),
-        message: 'Поле image должно быть валидным URL до изображения',
-      },
+      required: false,
+      match: [
+        /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/,
+        'Поле image должно быть валидным URL до изображения',
+      ],
     },
     slug: {
       type: String,
